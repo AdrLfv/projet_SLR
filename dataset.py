@@ -38,17 +38,6 @@ class CustomImageDataset():
                         os.makedirs(os.path.join(
                         self.DATA_PATH_TEST, action, str(int(sequence-self.nb_sequences*90/100))))
                     print("sucess")
-
-                    # if(sequence<self.nb_sequences*80/100):
-                    #     os.makedirs(os.path.join(
-                    #     self.DATA_PATH_TRAIN, action, str(sequence)))
-                    # elif(self.nb_sequences*80/100 <= sequence and sequence < self.nb_sequences*90/100):
-                    #     os.makedirs(os.path.join(
-                    #     self.DATA_PATH_VALID, action, str(int(sequence-self.nb_sequences*80/100))))
-                    # else:
-                    #     os.makedirs(os.path.join(
-                    #     self.DATA_PATH_TEST, action, str(int(sequence-self.nb_sequences*90/100))))
-                    # print("sucess")
                    
                 except:
                     pass

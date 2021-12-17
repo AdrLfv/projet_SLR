@@ -23,7 +23,7 @@ class myLSTM(nn.Module):
         else:
             self.layer = nn.Linear(hidden_size, output_size)
 
-    def forward(self, images, prints=False):
+    def forward(self, images):
         #print('images shape:', images.shape)
 
         # Set initial states

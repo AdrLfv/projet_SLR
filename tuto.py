@@ -216,7 +216,7 @@ class Tuto:
 
         # Recuperation des donnees du dataset
         #for _, action in enumerate(self.actions):
-        sequence = 0
+        sequence = 1
         window = []
         for frame_num in range(sequence_length):
             res = np.load(os.path.join(DATA_PATH, self.action, str(

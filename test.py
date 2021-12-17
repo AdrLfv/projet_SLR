@@ -19,14 +19,23 @@ def mediapipe_detection(image, model):
     return image, results
 
 
-def prob_viz(res, actions, input_frame, colors):
+def prob_viz(res, actions, input_frame, colors, action):
     output_frame = input_frame.copy()
-    for num, prob in enumerate(res):
-        cv2.rectangle(output_frame, (0, 60+num*40),
-                      (int(prob*100), 90+num*40), colors[num], -1)
-        cv2.putText(output_frame, actions[num], (0, 85+num*40),
+    indCol = 0
+    prob = res[np.argmax(res)]
+    cv2.rectangle(output_frame, (0, 60),
+                      (int(prob*100), 90),
+                      colors[indCol], -1)
+    cv2.putText(output_frame, actions[np.argmax(res)], (0, 85),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
+    cv2.rectangle(output_frame, (0, 560),
+                      (100, 590),
+                      colors[1], -1)
+    cv2.putText(output_frame, action, (0, 585),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+    
+    
     return output_frame
 
 
@@ -69,17 +78,6 @@ def extract_keypoints(results):
     rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten(
     ) if results.right_hand_landmarks else np.zeros(21*3)
     return np.concatenate([pose, face, lh, rh])
-
-
-def prob_viz(res, actions, input_frame, colors):
-    output_frame = input_frame.copy()
-    for num, prob in enumerate(res):
-        cv2.rectangle(output_frame, (0, 60+num*40),
-                      (int(prob*100), 90+num*40), colors[num], -1)
-        cv2.putText(output_frame, actions[num], (0, 85+num*40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-
-    return output_frame
 
 
 def launch_test(actions, model, action):
@@ -135,7 +133,7 @@ def launch_test(actions, model, action):
                     sentence = sentence[-5:]
 
                 # Viz probabilities
-                image = prob_viz(res, actions, image, colors)
+                image = prob_viz(res, actions, image, colors, action)
                 if(actions[np.argmax(res)] == action):
                     count_valid +=1
                 else : count_valid = 0
@@ -155,15 +153,4 @@ def launch_test(actions, model, action):
                 break
         cap.release()
         
-def prob_viz(res, actions, input_frame, colors):
-    output_frame = input_frame.copy()
-    indCol = 0
 
-    prob = res[np.argmax(res)]
-    cv2.rectangle(output_frame, (0, 60),
-                      (int(prob*100), 90),
-                      colors[indCol], -1)
-    cv2.putText(output_frame, actions[np.argmax(res)], (0, 85),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-    
-    return output_frame
