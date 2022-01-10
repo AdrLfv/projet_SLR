@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import os
 
-from projet_SLR.test import launch_test, prob_viz
+from slr_project_mirror.test import launch_test, prob_viz
 
 
 FACE_LINKS = [

@@ -2,20 +2,34 @@ import cv2
 import os
 import mediapipe as mp
 import numpy as np
-from projet_SLR.test import mediapipe_detection, draw_styled_landmarks, extract_keypoints
+from slr_project_mirror.test import mediapipe_detection, draw_styled_landmarks, IntelVideoReader
 
 mp_holistic = mp.solutions.holistic  # Holistic model
 
+# dans la création du dataset, je garde les points du visage au cas où
+def extract_keypoints(results):
+    pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten(
+    ) if results.pose_landmarks else np.zeros(33*4)
+    face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten(
+    ) if results.face_landmarks else np.zeros(468*3)
+    lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten(
+    ) if results.left_hand_landmarks else np.zeros(21*3)
+    rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten(
+    ) if results.right_hand_landmarks else np.zeros(21*3)
+    return np.concatenate([pose, face, lh, rh])
 
 class CustomImageDataset():
     # class CustomImageDataset(Dataset):
-    def __init__(self, actionsToAdd, nb_sequences, sequence_length, DATA_PATH_TRAIN, DATA_PATH_VALID, DATA_PATH_TEST):
+    def __init__(self, actionsToAdd, nb_sequences, sequence_length, DATA_PATH_TRAIN, DATA_PATH_VALID, DATA_PATH_TEST, RESOLUTION_X,RESOLUTION_Y):
         self.actionsToAdd = actionsToAdd
         self.nb_sequences = nb_sequences
         self.sequence_length = sequence_length
         self.DATA_PATH_TRAIN =DATA_PATH_TRAIN
         self.DATA_PATH_VALID =DATA_PATH_VALID
         self.DATA_PATH_TEST =DATA_PATH_TEST
+        self.RESOLUTION_X = RESOLUTION_X
+        self.RESOLUTION_Y = RESOLUTION_Y
+        self.cap = IntelVideoReader()
         print('dataset init')
 
     def __len__(self):
@@ -42,7 +56,6 @@ class CustomImageDataset():
                 except:
                     pass
         
-        cap = cv2.VideoCapture(0)
         # Set mediapipe model
         with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
 
@@ -62,9 +75,11 @@ class CustomImageDataset():
                     for frame_num in range(self.sequence_length):
 
                         # Read feed
-                        ret, frame = cap.read()
+                        frame, depth = self.cap.next_frame()
 
                         # Make detections
+                        frame= cv2.resize(frame,(self.RESOLUTION_Y,self.RESOLUTION_X))
+
                         image, results = mediapipe_detection(frame, holistic)
 
                         # Draw landmarks
@@ -106,7 +121,7 @@ class CustomImageDataset():
                         # Break gracefully
                         if cv2.waitKey(10) & 0xFF == ord('q'):
                             break               
-            cap.release()
+            self.cap.release()
             cv2.destroyAllWindows()
 
         

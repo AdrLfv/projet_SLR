@@ -8,6 +8,88 @@ mp_holistic = mp.solutions.holistic
 colors = [(245, 117, 16), (117, 245, 16), (16, 117, 245)]
 mp_drawing = mp.solutions.drawing_utils  # Drawing utilities
 
+def extract_keypoints_no_face(results):
+    pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten(
+    ) if results.pose_landmarks else np.zeros(33*4)
+    # face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten(
+    # ) if results.face_landmarks else np.zeros(468*3)
+    lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten(
+    ) if results.left_hand_landmarks else np.zeros(21*3)
+    rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten(
+    ) if results.right_hand_landmarks else np.zeros(21*3)
+    return np.concatenate([pose, lh, rh])
+
+class IntelVideoReader:
+    """
+    (Thread)
+    * Reads frames from the intel Realsense D435I Camera (color and depth frames)
+    """
+
+    def __init__(self):
+        import pyrealsense2 as rs
+
+        self.pipe = rs.pipeline()
+        config = rs.config()
+
+        # ctx = rs.context()
+        # devices = ctx.query_devices()
+        # for dev in devices:
+        #     dev.hardware_reset()
+
+        self.width = 848
+        self.height = 480
+
+        config.enable_stream(
+            rs.stream.depth, self.width, self.height, rs.format.z16, 30
+        )
+        config.enable_stream(
+            rs.stream.color, self.width, self.height, rs.format.bgr8, 30
+        )
+
+        profile = self.pipe.start(config)
+
+        depth_sensor = profile.get_device().first_depth_sensor()
+        self.depth_scale = depth_sensor.get_depth_scale()
+
+        clipping_distance_in_meters = 3
+        clipping_distance = clipping_distance_in_meters / self.depth_scale
+
+        # device = profile.get_device()
+        # depth_sensor = device.first_depth_sensor()
+        # device.hardware_reset()
+
+        align_to = rs.stream.color
+        self.align = rs.align(align_to)
+
+        self.depth_to_disparity = rs.disparity_transform(True)
+        self.disparity_to_depth = rs.disparity_transform(False)
+        self.dec_filter = rs.decimation_filter()
+        self.temp_filter = rs.temporal_filter()
+        self.spat_filter = rs.spatial_filter()
+
+    def next_frame(self):
+        """Collects color and frames"""
+        frameset = self.pipe.wait_for_frames()
+
+        aligned_frames = self.align.process(frameset)
+
+        color_frame = aligned_frames.get_color_frame()
+        depth_frame = aligned_frames.get_depth_frame()
+
+        self.depth_intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
+        self.color_intrinsics = color_frame.profile.as_video_stream_profile().intrinsics
+
+        depth_frame = self.depth_to_disparity.process(depth_frame)
+        depth_frame = self.dec_filter.process(depth_frame)
+        depth_frame = self.temp_filter.process(depth_frame)
+        depth_frame = self.spat_filter.process(depth_frame)
+        depth_frame = self.disparity_to_depth.process(depth_frame)
+        depth_frame = depth_frame.as_depth_frame()
+
+        color_frame = np.fliplr(np.asanyarray(color_frame.get_data()))
+        depth_frame = np.fliplr(np.asanyarray(depth_frame.get_data()))
+
+        return [color_frame, depth_frame]
 
 def mediapipe_detection(image, model):
     # COLOR CONVERSION BGR 2 RGB
@@ -68,27 +150,13 @@ def draw_styled_landmarks(image, results):
                               )
 
 
-def extract_keypoints(results):
-    pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten(
-    ) if results.pose_landmarks else np.zeros(33*4)
-    face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten(
-    ) if results.face_landmarks else np.zeros(468*3)
-    lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten(
-    ) if results.left_hand_landmarks else np.zeros(21*3)
-    rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten(
-    ) if results.right_hand_landmarks else np.zeros(21*3)
-    return np.concatenate([pose, face, lh, rh])
-
-
-def launch_test(actions, model, action):
+def launch_test(actions, model, action, RESOLUTION_X, RESOLUTION_Y):
 
     colors = [(245, 117, 16), (117, 245, 16), (16, 117, 245)]
 
     sequence = []
     sentence = []
     threshold = 0.9
-    RESOLUTION_X = int(1920*9/10)  # Screen resolution in pixel
-    RESOLUTION_Y = int(1080*9/10)
     cap = cv2.VideoCapture(0)
     count_valid = 0
     # Set mediapipe model
@@ -96,17 +164,24 @@ def launch_test(actions, model, action):
         while cap.isOpened():
 
             # Read feed
-            ret, frame = cap.read()
+            frame, depth = cap.next_frame()
+            frame= cv2.resize(frame,(RESOLUTION_Y,RESOLUTION_X))
 
             # Make detections
             image, results = mediapipe_detection(frame, holistic)
             # print(results)
-            image = cv2.resize(image,(RESOLUTION_X,RESOLUTION_Y))
+            #image = cv2.resize(image,(RESOLUTION_Y,RESOLUTION_X))
+            
             # Draw landmarks
             draw_styled_landmarks(image, results)
-            image = cv2.flip(image, 1)
+            #image = cv2.flip(image, 1)
+            window = 0.5
+            min_width, max_width = int((0.5-window/2)*RESOLUTION_X), int((0.5+window/2)*RESOLUTION_X)
+            
+            image = image[:, min_width:max_width]  
+            
             # 2. Prediction logic
-            keypoints = extract_keypoints(results)
+            keypoints = extract_keypoints_no_face(results)
     #         sequence.insert(0,keypoints)
     #         sequence = sequence[:30]
             sequence.append(keypoints)

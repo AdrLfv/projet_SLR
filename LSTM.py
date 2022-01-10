@@ -39,7 +39,7 @@ class myLSTM(nn.Module):
                 self.layer_size, images.size(0), self.hidden_size)
 
         # LSTM:
-        #print(images.shape)
+        #print("images shape",images.shape)
         output, (last_hidden_state, last_cell_state) = self.lstm(images)
         
         # Reshape

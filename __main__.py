@@ -1,4 +1,4 @@
-#!pip install tensorflow==2.4.1 tensorflow-gpu==2.4.1 opencv-python mediapipe sklearn matplotlib
+#!pip install opencv-python mediapipe
 
 import numpy as np
 import os
@@ -7,13 +7,11 @@ import mediapipe as mp
 import torch
 
 
-from projet_SLR.dataset import CustomImageDataset
-from projet_SLR.load_LSTM import load_LSTM
-from projet_SLR.LSTM import myLSTM
-from projet_SLR.preprocess import Preprocess
-from projet_SLR.test import launch_test
-from projet_SLR.tuto import Tuto
-from sklearn.metrics import multilabel_confusion_matrix, accuracy_score
+from slr_project_mirror.dataset import CustomImageDataset
+from slr_project_mirror.LSTM import myLSTM
+from slr_project_mirror.preprocess import Preprocess
+from slr_project_mirror.test import launch_test, IntelVideoReader
+from slr_project_mirror.tuto import Tuto
 # Gives easier dataset managment by creating mini batches etc.
 from torch.utils.data import DataLoader
 from torch import nn  # All neural network modules
@@ -29,7 +27,7 @@ def launch_LSTM(output_size, train):
     learning_rate = 0.001  # how much to update models parameters at each batch/epoch
     batch_size = 32  # number of data samples propagated through the network before the parameters are updated
     NUM_WORKERS = 4
-    num_epochs = 50  # number times to iterate over the dataset
+    num_epochs = 100  # number times to iterate over the dataset
     DECAY = 1e-4
     hidden_size = 128  # number of features in the hidden state h
     num_layers = 2
@@ -39,6 +37,7 @@ def launch_LSTM(output_size, train):
     test_preprocess = Preprocess(actions, DATA_PATH_TEST, nb_sequences_test, sequence_length, False)
 
     input_size = train_preprocess.get_data_length()
+    #print("input size",input_size)
 
     train_loader = DataLoader(train_preprocess, batch_size=batch_size, shuffle=True, num_workers=NUM_WORKERS,
                               pin_memory=True)
@@ -100,8 +99,8 @@ def train_launch(model, learning_rate, DECAY, num_epochs, train_loader, test_loa
 DATA_PATH_TRAIN = os.path.join('MP_Data/Train')
 DATA_PATH_VALID = os.path.join('MP_Data/Valid')
 DATA_PATH_TEST = os.path.join('MP_Data/Test')
-RESOLUTION_X = int(1920*9/10)  # Screen resolution in pixel
-RESOLUTION_Y = int(1080*9/10)
+RESOLUTION_Y = int(1920)  # Screen resolution in pixel
+RESOLUTION_X = int(1680)
 # Thirty videos worth of data
 nb_sequences = 30
 nb_sequences_train = int(nb_sequences*80/100)
@@ -110,7 +109,7 @@ nb_sequences_test = int(nb_sequences*10/100)
 # Videos are going to be 30 frames in length
 sequence_length = 30
 
-# =====================================Parametres à modifier =====================================================
+# ===================================== Parameters to modify =====================================================
 make_train =  True
 make_dataset = False
 make_data_augmentation = True
@@ -120,8 +119,6 @@ if(make_dataset): make_train = True
 # dataset making : (ajouter des actions dans le actionsToAdd pour créer leur dataset)
 actionsToAdd = ["empty"]  #
 
-
-
 # Actions that we try to detect
 actions = np.array(["nothing","empty", "hello", "thanks", "iloveyou", "what's up",  "my", "name","nice","to meet you"])
 #, "nothing" 'hello', 'thanks', 'iloveyou', "what's up", "hey", "my", "name", "nice","to meet you"
@@ -130,13 +127,13 @@ actions = np.array(["nothing","empty", "hello", "thanks", "iloveyou", "what's up
 # on crée des instances de preprocess en leur donnant le chemin d'accès ainsi que le nombre de séquences dans chaque dossier
 # en fonction de si leur type de preprocess est train, valid, test.
 #
-if (make_dataset): CustomImageDataset(actionsToAdd, nb_sequences, sequence_length, DATA_PATH_TRAIN, DATA_PATH_VALID, DATA_PATH_TEST).__getitem__()
+if (make_dataset): CustomImageDataset(actionsToAdd, nb_sequences, sequence_length, DATA_PATH_TRAIN, DATA_PATH_VALID, DATA_PATH_TEST, RESOLUTION_X, RESOLUTION_Y).__getitem__()
 
 # Appel du modele
 model = launch_LSTM(len(actions),make_train)
-
+cap = IntelVideoReader()
 for action in actions:
     if (action != "nothing" and action != "empty"):
         Tuto(actions, action, RESOLUTION_X, RESOLUTION_Y).launch_tuto()
-        launch_test(actions, model, action)
+        launch_test(actions, model, action,cap)
         
